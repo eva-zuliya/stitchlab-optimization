@@ -1,5 +1,4 @@
 from enum import Enum
-from pyscipopt import SCIP_RESULT
 from ortools.linear_solver import pywraplp
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.sat.python import cp_model
@@ -17,7 +16,7 @@ class SolverStatus(str, Enum):
     SOLVED_INFEASIBLE = "solved_infeasible"
 
     @classmethod
-    def from_pyscipopt_status(cls, status: SCIP_RESULT) -> "SolverStatus":
+    def from_pyscipopt_status(cls, status: str) -> "SolverStatus":
         if status == "optimal":
             return cls.OPTIMAL
         elif status == "infeasible":
