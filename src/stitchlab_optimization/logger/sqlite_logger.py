@@ -33,6 +33,7 @@ class SQLiteLogManager(LogManager):
                     );
                 """)
 
+            if self.is_monitor_runtime:
                 conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self._dir_workflow_execution_log} (
                         id                 INTEGER PRIMARY KEY AUTOINCREMENT,

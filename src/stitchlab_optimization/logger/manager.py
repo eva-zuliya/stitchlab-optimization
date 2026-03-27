@@ -17,7 +17,7 @@ class ModelLog(BaseModel):
     objective_value: Optional[float]
     message: Optional[str]
     runtime_sec: float
-    created_at: str
+    created_timestamp: str
 
     def to_sql_log(self) -> dict:
         return {
@@ -32,36 +32,24 @@ class ModelLog(BaseModel):
             "status": self.status.value,
             "message": self.message,
             "runtime_sec": self.runtime_sec,
-            "created_at": self.created_at
+            "created_timestamp": self.created_timestamp
         }
 
 
-# class WorkflowLog(BaseModel):
-#     request_id: str
-#     model_ids: list[str]
-#     payload: dict
-#     solver_parameter: dict
-#     message: Optional[str]
-#     start_timestamp: str
-#     end_timestamp: Optional[str]
-#     runtime_sec: Optional[float]
-
-#     @classmethod
-#     def from_workflow(cls, workflow: OptimizationWorkflow) -> "WorkflowLog":
-#         return WorkflowLog(
-#             request_id=workflow.id,
-#             model_ids=[model_id for model_id in workflow.models_registry.keys()],
-#             payload=workflow.payload.model_dump(),
-#             solver_parameter={}, # TODO: extract from workflow execution context
-#             message=None,
-#             start_timestamp=datetime.now(timezone.utc).isoformat(),
-#             end_timestamp=None,
-#             runtime_sec=None
-#         )
+class WorkflowLog(BaseModel):
+    request_id: str
+    model_ids: list[str]
+    payload: dict
+    solver_parameter: dict
+    message: Optional[str]
+    start_timestamp: Optional[str]
+    end_timestamp: Optional[str]
+    runtime_sec: Optional[float]
 
 
 class LogManager:
     is_monitor_optimality: bool = True
+    is_monitor_runtime: bool = True
     is_monitor_resource: bool = False
 
     _dir_model_execution_log: str = "log_execution_model"
@@ -76,7 +64,7 @@ class LogManager:
         pass
 
     @abstractmethod
-    def put_workflow_log(self, workflow_log: dict):
+    def put_workflow_log(self, workflow_log: WorkflowLog):
         pass
 
     @abstractmethod

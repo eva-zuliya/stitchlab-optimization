@@ -319,7 +319,7 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
             end_time = time.time()
             self.builder.runtime_seconds = end_time - start_time
 
-            if logger is not None:
+            if logger is not None and logger.is_monitor_optimality:
                 logger.put_model_log(model_log=self._model_log)
         
         return solution
@@ -414,5 +414,5 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
             objective_value=objective_value,
             message=builder.runtime_message,
             runtime_sec=builder.runtime_seconds,
-            created_at=datetime.now(timezone.utc).isoformat()
+            created_timestamp=datetime.now(timezone.utc).isoformat()
         )

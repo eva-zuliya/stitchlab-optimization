@@ -2,8 +2,10 @@ from abc import ABC, ABCMeta, abstractmethod
 from typing import Dict, Type, Generic, TypeVar, final, Any, Optional
 import uuid
 from pydantic import BaseModel
+from datetime import datetime, timezone
+import time
 
-from src.stitchlab_optimization.logger.manager import LogManager, ModelLog
+from src.stitchlab_optimization.logger.manager import LogManager, WorkflowLog
 from src.stitchlab_optimization.builder.model import OptimizationModel
 from src.stitchlab_optimization.solver.engine import SolverEngine
 
@@ -55,9 +57,34 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
         self._logger = logger
         
     @final
-    def invoke(self) -> dict:
-        result = self.execute()
-        return result.model_dump()
+    def invoke(self) -> Optional[dict]:
+        workflow_log = self._workflow_log
+        workflow_log.start_timestamp = datetime.now(timezone.utc).isoformat()
+        start_time = time.time()
+
+        try:
+            result = self.execute()
+            workflow_log.message = "success"
+
+        except Exception as e:
+            workflow_log.message = str(e)
+
+        finally:
+            runtime_sec = time.time() - start_time
+            workflow_log.end_timestamp = datetime.now(timezone.utc).isoformat()
+            workflow_log.runtime_sec = runtime_sec
+
+            if self._logger is not None and self._logger.is_monitor_runtime:
+                self._logger.put_workflow_log(workflow_log=workflow_log)
+
+        if workflow_log.message == "success":
+            return result.model_dump()
+        
+        return None
+
+    @abstractmethod
+    def execute(self) -> OutputBaseModel:
+        pass
 
     @final
     def execute_model(self, model_name: str, params: Any, solver_engine: Optional[SolverEngine] = None) -> Any:
@@ -70,14 +97,19 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
             solver_engine=solver_engine
         )
 
-        output = model_instance.execute()
-
-        if self._logger is not None:
-            model_log = ModelLog.from_model(model=model_instance)                    
-            self._logger.put_model_log(model_log=model_log)
+        output = model_instance.execute(logger=self._logger)
 
         return output
 
-    @abstractmethod
-    def execute(self) -> OutputBaseModel:
-        pass
+    @property
+    def _workflow_log(self) -> WorkflowLog:
+        return WorkflowLog(
+            request_id=self.id,
+            model_ids=[model_id for model_id in self.models_registry.keys()],
+            payload=self.payload.model_dump(),
+            solver_parameter={}, # TODO: extract from workflow execution context
+            message=None,
+            start_timestamp=None,
+            end_timestamp=None,
+            runtime_sec=None
+        )
