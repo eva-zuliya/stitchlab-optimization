@@ -1,5 +1,7 @@
 from src.stitchlab_optimization.builder.model import OptimizationModel, ModelParams, ModelBuilder
 from src.stitchlab_optimization.solver.engine import SolverEngine
+from src.stitchlab_optimization.logger.sqlite_logger import SQLiteLogManager
+
 from pydantic import BaseModel
 
 
@@ -98,10 +100,13 @@ class SimpleModel(OptimizationModel[SimpleParams, SimpleSolution]):
 
 
 if __name__ == "__main__":
+
+    logger = SQLiteLogManager(db_path="test.db")
+
     model = SimpleModel(
         params=SimpleParams(),
-        solver_engine=SolverEngine.ORTOOLS_SCIP
+        solver_engine=SolverEngine.ORTOOLS_CPSAT
     )
 
-    result = model.execute()
+    result = model.execute(logger=logger)
     print(result)

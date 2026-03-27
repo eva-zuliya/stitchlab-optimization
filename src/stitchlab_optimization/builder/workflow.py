@@ -3,7 +3,7 @@ from typing import Dict, Type, Generic, TypeVar, final, Any, Optional
 import uuid
 from pydantic import BaseModel
 
-from src.stitchlab_optimization.logger.manager import ModelLogManager, ModelLog
+from src.stitchlab_optimization.logger.manager import LogManager, ModelLog
 from src.stitchlab_optimization.builder.model import OptimizationModel
 from src.stitchlab_optimization.solver.engine import SolverEngine
 
@@ -41,7 +41,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
 
     _input_basemodel: Type[InputBaseModel]
     _output_basemodel: Type[OutputBaseModel]
-    _logger: Optional[ModelLogManager] = None
+    _logger: Optional[LogManager] = None
 
     id: str
     name: str
@@ -49,7 +49,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
     payload: InputBaseModel
     
     @final
-    def __init__(self, payload: dict, logger: Optional[ModelLogManager] = None):
+    def __init__(self, payload: dict, logger: Optional[LogManager] = None):
         self.id = str(uuid.uuid4())
         self.payload = self._input_basemodel(**payload)
         self._logger = logger

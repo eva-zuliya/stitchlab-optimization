@@ -11,7 +11,7 @@ from typing import Any, Dict, Generic, Type, Optional, TypeVar, final
 
 from src.stitchlab_optimization.solver.engine import SolverEngine
 from src.stitchlab_optimization.solver.status import SolverStatus
-from src.stitchlab_optimization.tools.utils import monitor_resources
+from src.stitchlab_optimization.logger.manager import ModelLog, LogManager
 
 from src.stitchlab_optimization.solver.config import SolverConfig
 SOLVER_CONFIG = SolverConfig()
@@ -29,14 +29,9 @@ class ModelParams(BaseModel, ABC):
 
 class ModelMeta(ABCMeta):
     def __new__(mcls, name, bases, attrs):
-        cls = super().__new__(mcls, name, bases, attrs)
-
-        if "name" not in attrs:
-            attrs["name"] = name
-
         # Skip base class
         if ABC in bases:
-            return cls
+            return super().__new__(mcls, name, bases, attrs)
 
         # Enforce that each subclass defines `builders`
         if "builders_registry" not in attrs:
@@ -46,7 +41,11 @@ class ModelMeta(ABCMeta):
         if not isinstance(attrs["builders_registry"], dict):
             raise TypeError(f"{name}.builders_registry must be a dict[SolverEngine, Type[ModelBuilder].")
 
-        return cls
+        # Set name if not provided
+        if "name" not in attrs:
+            attrs["name"] = name
+
+        return super().__new__(mcls, name, bases, attrs)
 
 
 class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
@@ -304,13 +303,13 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
         )
 
     @final
-    def execute(self) -> Optional[SolutionBaseModel]:
+    def execute(self, logger: Optional[LogManager] = None) -> Optional[SolutionBaseModel]:
         start_time = time.time()
         solution = None
 
         try :
             solution = self.builder.execute()
-            self.builder.runtime_message = "Success"
+            self.builder.runtime_message = "success"
 
         except Exception as e:
             print(f"\033[91m\n>>> ERROR while Solving Model : {e}\n\033[0m")
@@ -319,6 +318,9 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
         finally:
             end_time = time.time()
             self.builder.runtime_seconds = end_time - start_time
+
+            if logger is not None:
+                logger.put_model_log(model_log=self._model_log)
         
         return solution
 
@@ -327,3 +329,90 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
 
     def get_solution(self) -> Optional[SolutionBaseModel]:
         return self.builder.solution
+
+    @property
+    def _model_log(self) -> ModelLog:
+        builder = self.builder
+        solver_engine = self.builder.solver_engine
+
+        if solver_engine == SolverEngine.GUROBI:
+            # Gurobi Python API
+            problem_size_vars = builder.model.NumVars
+            problem_size_cons = builder.model.NumConstrs
+
+            if builder.model.NumObj <= 1:
+                optimality_gap = builder.model.MIPGap
+                objective_value = builder.model.ObjVal
+
+            else:
+                objective_value = builder.model.getAttr("ObjNVal")
+                optimality_gap   = builder.model.getAttr("ObjNRelTol")
+
+        elif solver_engine == SolverEngine.ORTOOLS_SCIP:
+            # OR-Tools CP-SAT solver (pywraplp.Solver)
+            problem_size_vars = builder.model.NumVariables()
+            problem_size_cons = builder.model.NumConstraints()
+
+            try:
+                optimality_gap = builder.model.MipGap()
+            except AttributeError:
+                optimality_gap = None
+                
+            objective_value = builder.model.Objective().Value()
+            
+        elif solver_engine == SolverEngine.ORTOOLS_ROUTING:
+            # OR-Tools RoutingModel
+            count_nodes = builder.model.Size()
+            count_vehicles = builder.model.vehicles()
+            problem_size_vars = count_nodes * count_nodes * count_vehicles
+
+            # RoutingModel does not expose number of constraints directly
+            problem_size_cons = None
+            objective_value = builder.solution.ObjectiveValue()
+            optimality_gap = None
+        
+        elif solver_engine == SolverEngine.ORTOOLS_CPSAT:
+            problem_size_vars = len(builder.model.Proto().variables)
+            problem_size_cons = len(builder.model.Proto().constraints)
+
+            # Objective value (only available if model solved)
+            try:
+                objective_value = builder.solution.ObjectiveValue()
+            except Exception:
+                objective_value = None
+
+            optimality_gap = None
+
+        elif solver_engine == SolverEngine.PYSCIPOPT:
+            problem_size_vars = builder.model.getNVars()
+            problem_size_cons = builder.model.getNConss()
+            optimality_gap = builder.model.getGap()
+
+            try:
+                objective_value = builder.model.getObjVal()
+            except Exception:
+                objective_value = None
+
+        elif solver_engine == SolverEngine.SKLEARN:
+            # scikit-learn is not an optimization solver, so these are not applicable
+            problem_size_vars = None
+            problem_size_cons = None
+            optimality_gap = None
+            objective_value = None
+
+        else:
+            raise ValueError(f"Solver engine {solver_engine} not supported")
+
+        return ModelLog(
+            solver_engine=solver_engine,
+            model_id=self.id,
+            model_name=self.name,
+            status=builder.solver_status,
+            problem_size_vars=problem_size_vars,
+            problem_size_cons=problem_size_cons,
+            optimality_gap=optimality_gap,
+            objective_value=objective_value,
+            message=builder.runtime_message,
+            runtime_sec=builder.runtime_seconds,
+            created_at=datetime.now(timezone.utc).isoformat()
+        )

@@ -1,18 +1,14 @@
-
 from abc import abstractmethod
 from pydantic import BaseModel
-from datetime import datetime, timezone
 from typing import Optional
 
-from stitchlab_optimization.builder.model import OptimizationModel
-from stitchlab_optimization.solver.engine import SolverEngine
-from stitchlab_optimization.solver.status import SolverStatus
+from src.stitchlab_optimization.solver.engine import SolverEngine
+from src.stitchlab_optimization.solver.status import SolverStatus
 
 
 class ModelLog(BaseModel):
     solver_engine: SolverEngine
     model_id: str
-    exec_id: str
     model_name: str
     status: SolverStatus
     problem_size_vars: Optional[int]
@@ -23,118 +19,66 @@ class ModelLog(BaseModel):
     runtime_sec: float
     created_at: str
 
-    @classmethod
-    def from_model(cls, model: OptimizationModel) -> "ModelLog":
-        builder = model.builder
-        solver_engine = builder.solver_engine
-
-        if solver_engine == SolverEngine.GUROBI:
-            # Gurobi Python API
-            problem_size_vars = builder.model.NumVars
-            problem_size_cons = builder.model.NumConstrs
-
-            if builder.model.NumObj <= 1:
-                optimality_gap = builder.model.MIPGap
-                objective_value = builder.model.ObjVal
-
-            else:
-                objective_value = builder.model.getAttr("ObjNVal")
-                optimality_gap   = builder.model.getAttr("ObjNRelTol")
-
-        elif solver_engine == SolverEngine.ORTOOLS_SCIP:
-            # OR-Tools CP-SAT solver (pywraplp.Solver)
-            problem_size_vars = builder.model.NumVariables()
-            problem_size_cons = builder.model.NumConstraints()
-
-            try:
-                optimality_gap = builder.model.MipGap()
-            except AttributeError:
-                optimality_gap = None
-                
-            objective_value = builder.model.Objective().Value()
-            
-        elif solver_engine == SolverEngine.ORTOOLS_ROUTING:
-            # OR-Tools RoutingModel
-            count_nodes = builder.model.Size()
-            count_vehicles = builder.model.vehicles()
-            problem_size_vars = count_nodes * count_nodes * count_vehicles
-
-            # RoutingModel does not expose number of constraints directly
-            problem_size_cons = None
-            objective_value = builder.solution.ObjectiveValue()
-            optimality_gap = None
-        
-        elif solver_engine == SolverEngine.ORTOOLS_CPSAT:
-            problem_size_vars = len(builder.model.Proto().variables)
-            problem_size_cons = len(builder.model.Proto().constraints)
-
-            # Objective value (only available if model solved)
-            try:
-                objective_value = builder.solution.ObjectiveValue()
-            except Exception:
-                objective_value = None
-
-            optimality_gap = None
-
-        elif solver_engine == SolverEngine.PYSCIPOPT:
-            problem_size_vars = builder.model.getNVars()
-            problem_size_cons = builder.model.getNConss()
-            optimality_gap = builder.model.getGap()
-
-            try:
-                objective_value = builder.model.getObjVal()
-            except Exception:
-                objective_value = None
-
-        elif solver_engine == SolverEngine.SKLEARN:
-            # scikit-learn is not an optimization solver, so these are not applicable
-            problem_size_vars = None
-            problem_size_cons = None
-            optimality_gap = None
-            objective_value = None
-
-        else:
-            raise ValueError(f"Solver engine {solver_engine} not supported")
-
-        return ModelLog(
-            solver_engine=solver_engine,
-            model_id=model.id,
-            exec_id=model.id,
-            model_name=model.name,
-            status=builder.solver_status,
-            problem_size_vars=problem_size_vars,
-            problem_size_cons=problem_size_cons,
-            optimality_gap=optimality_gap,
-            objective_value=objective_value,
-            message=builder.runtime_message,
-            runtime_sec=builder.runtime_seconds,
-            created_at=datetime.now(timezone.utc).isoformat()
-        )
-
-    # def write_to_db(self):
-    #     log = {
-    #         "id": None,
-    #         "solver_engine": self.solver_engine.value,
-    #         "model_id": self.model_id,
-    #         "exec_id": self.exec_id,
-    #         "model_name": self.model_name,
-    #         "problem_size_vars": self.problem_size_vars,
-    #         "problem_size_cons": self.problem_size_cons,
-    #         "optimality_gap": self.optimality_gap,
-    #         "objective_value": self.objective_value,
-    #         "status": self.status.value,
-    #         "message": self.message,
-    #         "runtime_sec": self.runtime_sec,
-    #         "created_at": self.created_at
-    #     }
-
-    #     insert_to_sqlite(table_name="execution_log", data=log)
+    def to_sql_log(self) -> dict:
+        return {
+            "id": None,
+            "solver_engine": self.solver_engine.value,
+            "model_id": self.model_id,
+            "model_name": self.model_name,
+            "problem_size_vars": self.problem_size_vars,
+            "problem_size_cons": self.problem_size_cons,
+            "optimality_gap": self.optimality_gap,
+            "objective_value": self.objective_value,
+            "status": self.status.value,
+            "message": self.message,
+            "runtime_sec": self.runtime_sec,
+            "created_at": self.created_at
+        }
 
 
-class ModelLogManager:
+# class WorkflowLog(BaseModel):
+#     request_id: str
+#     model_ids: list[str]
+#     payload: dict
+#     solver_parameter: dict
+#     message: Optional[str]
+#     start_timestamp: str
+#     end_timestamp: Optional[str]
+#     runtime_sec: Optional[float]
+
+#     @classmethod
+#     def from_workflow(cls, workflow: OptimizationWorkflow) -> "WorkflowLog":
+#         return WorkflowLog(
+#             request_id=workflow.id,
+#             model_ids=[model_id for model_id in workflow.models_registry.keys()],
+#             payload=workflow.payload.model_dump(),
+#             solver_parameter={}, # TODO: extract from workflow execution context
+#             message=None,
+#             start_timestamp=datetime.now(timezone.utc).isoformat(),
+#             end_timestamp=None,
+#             runtime_sec=None
+#         )
+
+
+class LogManager:
+    is_monitor_optimality: bool = True
+    is_monitor_resource: bool = False
+
+    _dir_model_execution_log: str = "log_execution_model"
+    _dir_workflow_execution_log: str = "log_execution_workflow"
+    _dir_resource_occupation_log: str = "log_resource_occupation"
+
     def __init__(self):
         pass
 
     @abstractmethod
     def put_model_log(self, model_log: ModelLog):
+        pass
+
+    @abstractmethod
+    def put_workflow_log(self, workflow_log: dict):
+        pass
+
+    @abstractmethod
+    def put_resource_log(self, resource_log: dict):
         pass
