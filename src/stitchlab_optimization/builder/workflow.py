@@ -40,7 +40,6 @@ class WorkflowMeta(ABCMeta):
 
 
 class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metaclass=WorkflowMeta):
-
     _input_basemodel: Type[InputBaseModel]
     _output_basemodel: Type[OutputBaseModel]
     _logger: Optional[LogManager] = None
