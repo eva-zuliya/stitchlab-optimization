@@ -1,4 +1,4 @@
-from .manager import LogManager, ModelLog
+from .manager import LogManager, ModelLog, WorkflowLog
 import sqlite3
 import pandas as pd
 
@@ -6,10 +6,11 @@ import pandas as pd
 class SQLiteLogManager(LogManager):
     db_path: str
 
-    def __init__(self, db_path: str, is_monitor_optimality: bool = True, is_monitor_resource: bool = False):
+    def __init__(self, db_path: str, is_monitor_optimality: bool = True, is_monitor_runtime: bool = True, is_monitor_resource: bool = False):
         self.db_path = db_path
         self.is_monitor_optimality = is_monitor_optimality
         self.is_monitor_resource = is_monitor_resource
+        self.is_monitor_runtime = is_monitor_runtime
     
         self.init_db()
 
@@ -29,7 +30,7 @@ class SQLiteLogManager(LogManager):
                         status             TEXT,            -- START / DONE / ERROR
                         message            TEXT,            -- optional note
                         runtime_sec        REAL,            -- optional
-                        created_at         TEXT
+                        created_timestamp  TEXT
                     );
                 """)
 
@@ -44,7 +45,8 @@ class SQLiteLogManager(LogManager):
                         message            TEXT,      -- store error message
                         start_timestamp    TEXT,      -- store start timestamp
                         end_timestamp      TEXT,      -- store end timestamp
-                        runtime_sec        REAL
+                        runtime_sec        REAL,
+                        created_timestamp  TEXT
                     );
                 """)
 
@@ -66,8 +68,14 @@ class SQLiteLogManager(LogManager):
             conn.commit()
 
     def put_model_log(self, model_log: ModelLog):
-        """Insert a DataFrame into SQLite."""
-
         with sqlite3.connect(self.db_path) as conn:
             data = pd.DataFrame([model_log.to_sql_log()])
             data.to_sql(self._dir_model_execution_log, conn, if_exists="append", index=False)
+
+    def put_workflow_log(self, workflow_log: WorkflowLog):
+        with sqlite3.connect(self.db_path) as conn:
+            data = pd.DataFrame([workflow_log.to_sql_log()])
+            data.to_sql(self._dir_workflow_execution_log, conn, if_exists="append", index=False)
+
+    def put_resource_log(self, resource_log):
+        return super().put_resource_log(resource_log)

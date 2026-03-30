@@ -12,9 +12,7 @@ from typing import Any, Dict, Generic, Type, Optional, TypeVar, final
 from src.stitchlab_optimization.solver.engine import SolverEngine
 from src.stitchlab_optimization.solver.status import SolverStatus
 from src.stitchlab_optimization.logger.manager import ModelLog, LogManager
-
 from src.stitchlab_optimization.solver.config import SolverConfig
-SOLVER_CONFIG = SolverConfig()
 
 
 ParamsBaseModel = TypeVar("ParamsBaseModel", bound="ModelParams")
@@ -115,6 +113,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             raise ValueError(f"Solver engine {self.solver_engine} not supported")
     
     def solve_pyscipopt(self):
+        SOLVER_CONFIG = SolverConfig()
         start_sol = None
         
         self.model.setParam("display/verblevel", SOLVER_CONFIG.MODEL_SOLVER_VERBOSE)
@@ -170,6 +169,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             self.construct_solution()
 
     def solve_gurobi(self):
+        SOLVER_CONFIG = SolverConfig()
+
         self.model.setParam('OutputFlag', SOLVER_CONFIG.MODEL_SOLVER_VERBOSE)
 
         start_sol = None
@@ -222,6 +223,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             self.construct_solution()
 
     def solve_ortools_routing(self):
+        SOLVER_CONFIG = SolverConfig()
+
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         search_parameters.first_solution_strategy = (
             routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
@@ -243,6 +246,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             self.construct_solution()
 
     def solve_ortools_cpsat(self):
+        SOLVER_CONFIG = SolverConfig()
+
         if self.model_vars is None:
             print(f"\033[91m\n>>> ERROR while Solving Model : Vars is not setup while building model\n\033[0m")
             self.solver_status = SolverStatus.ERROR
@@ -264,6 +269,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
                 self.construct_solution()
 
     def solve_ortools_scip(self):
+        SOLVER_CONFIG = SolverConfig()
+
         self.model.SetTimeLimit(int(SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60 * 1000))
         self.model.SetNumThreads(int(SOLVER_CONFIG.LIMIT_MULTI_THREAD))
 

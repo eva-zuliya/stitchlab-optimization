@@ -1,6 +1,7 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from pydantic import BaseModel
 from typing import Optional
+import json
 
 from src.stitchlab_optimization.solver.engine import SolverEngine
 from src.stitchlab_optimization.solver.status import SolverStatus
@@ -38,16 +39,35 @@ class ModelLog(BaseModel):
 
 class WorkflowLog(BaseModel):
     request_id: str
-    model_ids: list[str]
+    model_ids_execution: dict
     payload: dict
     solver_parameter: dict
     message: Optional[str]
-    start_timestamp: Optional[str]
-    end_timestamp: Optional[str]
-    runtime_sec: Optional[float]
+    start_timestamp: str
+    end_timestamp: str
+    runtime_sec: float
+    created_timestamp: str
+
+    def to_sql_log(self) -> dict:
+        model_ids = json.dumps(self.model_ids_execution)
+        payload = json.dumps(self.payload)
+        solver_parameter = json.dumps(self.solver_parameter)
+
+        return {
+            "id": None,
+            "request_id": self.request_id,
+            "model_ids": model_ids,
+            "payload": payload,
+            "solver_parameter": solver_parameter,
+            "message": self.message,
+            "start_timestamp": self.start_timestamp,
+            "end_timestamp": self.end_timestamp,
+            "runtime_sec": self.runtime_sec,
+            "created_timestamp": self.created_timestamp
+        }
 
 
-class LogManager:
+class LogManager(ABC):
     is_monitor_optimality: bool = True
     is_monitor_runtime: bool = True
     is_monitor_resource: bool = False

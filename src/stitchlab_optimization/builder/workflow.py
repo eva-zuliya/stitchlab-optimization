@@ -1,5 +1,5 @@
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Dict, Type, Generic, TypeVar, final, Any, Optional
+from typing import Dict, Type, Generic, TypeVar, final, Any, Optional, Union
 import uuid
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -8,6 +8,7 @@ import time
 from src.stitchlab_optimization.logger.manager import LogManager, WorkflowLog
 from src.stitchlab_optimization.builder.model import OptimizationModel
 from src.stitchlab_optimization.solver.engine import SolverEngine
+from src.stitchlab_optimization.solver.config import SolverConfig
 
 
 InputBaseModel = TypeVar("InputBaseModel", bound=BaseModel)
@@ -15,14 +16,12 @@ OutputBaseModel = TypeVar("OutputBaseModel", bound=BaseModel)
 
 class WorkflowMeta(ABCMeta):
     def __new__(mcls, name, bases, attrs):
-        cls = super().__new__(mcls, name, bases, attrs)
-
-        if "name" not in attrs:
-            attrs["name"] = name
-
         # Skip base class
         if ABC in bases:
-            return cls
+            return super().__new__(mcls, name, bases, attrs)
+        
+        if "name" not in attrs:
+            attrs["name"] = name
     
         # Enforce that each subclass defines `models_registry`
         if "models_registry" not in attrs:
@@ -32,11 +31,7 @@ class WorkflowMeta(ABCMeta):
         if not isinstance(attrs["models_registry"], dict):
             raise TypeError(f"{name}.models_registry must be a dict[str, Type[OptimizationModel].")
 
-        # Prevent overriding of execute()
-        if "final" in attrs:
-            raise TypeError("invoke() is FINAL and cannot be overridden.")
-
-        return cls
+        return super().__new__(mcls, name, bases, attrs)
 
 
 class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metaclass=WorkflowMeta):
@@ -48,35 +43,45 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
     name: str
     models_registry: Dict[str, Type[OptimizationModel]] # {model_name : OptimizationModel}
     payload: InputBaseModel
+
+    runtime_message: str = ""
+    runtime_seconds: float = 0
+    start_timestamp: str = ""
+    end_timestamp: str = ""
+
+    model_ids_execution: dict[str, str] = {}  # {model_id: model_name}
+
     
     @final
-    def __init__(self, payload: dict, logger: Optional[LogManager] = None):
+    def __init__(self, payload: Union[Dict, InputBaseModel], logger: Optional[LogManager] = None):
         self.id = str(uuid.uuid4())
-        self.payload = self._input_basemodel(**payload)
         self._logger = logger
+
+        if isinstance(payload, dict):
+            payload = self._input_basemodel(**payload)
+
+        self.payload = payload
         
     @final
     def invoke(self) -> Optional[dict]:
-        workflow_log = self._workflow_log
-        workflow_log.start_timestamp = datetime.now(timezone.utc).isoformat()
+        self.start_timestamp = datetime.now(timezone.utc).isoformat()
         start_time = time.time()
 
         try:
             result = self.execute()
-            workflow_log.message = "success"
+            self.runtime_message = "success"
 
         except Exception as e:
-            workflow_log.message = str(e)
+            self.runtime_message = str(e)
 
         finally:
-            runtime_sec = time.time() - start_time
-            workflow_log.end_timestamp = datetime.now(timezone.utc).isoformat()
-            workflow_log.runtime_sec = runtime_sec
+            self.runtime_seconds = time.time() - start_time
+            self.end_timestamp = datetime.now(timezone.utc).isoformat()
 
             if self._logger is not None and self._logger.is_monitor_runtime:
-                self._logger.put_workflow_log(workflow_log=workflow_log)
+                self._logger.put_workflow_log(workflow_log=self._workflow_log)
 
-        if workflow_log.message == "success":
+        if self.runtime_message == "success":
             return result.model_dump()
         
         return None
@@ -97,6 +102,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
         )
 
         output = model_instance.execute(logger=self._logger)
+        self.model_ids_execution[model_instance.id] = model_name
 
         return output
 
@@ -104,11 +110,12 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
     def _workflow_log(self) -> WorkflowLog:
         return WorkflowLog(
             request_id=self.id,
-            model_ids=[model_id for model_id in self.models_registry.keys()],
+            model_ids_execution=self.model_ids_execution,
             payload=self.payload.model_dump(),
-            solver_parameter={}, # TODO: extract from workflow execution context
-            message=None,
-            start_timestamp=None,
-            end_timestamp=None,
-            runtime_sec=None
+            solver_parameter=SolverConfig().SOLVER_PARAMETER,
+            message=self.runtime_message,
+            start_timestamp=self.start_timestamp,
+            end_timestamp=self.end_timestamp,
+            runtime_sec=self.runtime_seconds,
+            created_timestamp=datetime.now(timezone.utc).isoformat()
         )

@@ -27,6 +27,7 @@ class SolverConfig:
         self.LIMIT_MULTI_THREAD = int(os.getenv("LIMIT_MULTI_THREAD", 6))
 
         self.SOLVER_PARAMETER = {
+            "true_threshold": self.TRUE_THRESHOLD,
             "limit_minutes_heuristics": self.LIMIT_TIME_MINUTES_HEURISTICS,
             "limit_minutes_deterministic": self.LIMIT_TIME_MINUTES_DETERMINISTIC,
             "limit_optimality_gap_deterministic": self.LIMIT_OPTIMALITY_GAP_DETERMINISTIC,

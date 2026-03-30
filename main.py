@@ -1,4 +1,5 @@
 from src.stitchlab_optimization.builder.model import OptimizationModel, ModelParams, ModelBuilder
+from src.stitchlab_optimization.builder.workflow import OptimizationWorkflow
 from src.stitchlab_optimization.solver.engine import SolverEngine
 from src.stitchlab_optimization.logger.sqlite_logger import SQLiteLogManager
 
@@ -99,14 +100,44 @@ class SimpleModel(OptimizationModel[SimpleParams, SimpleSolution]):
     }
 
 
+
+class InputData(BaseModel):
+    id: str
+
+
+class OutputData(SimpleSolution):
+    pass
+
+
+class SimpleWorkflow(OptimizationWorkflow[InputData, OutputData]):
+    models_registry = {
+        "simple_model": SimpleModel
+    }
+
+    def execute(self):
+        return self.execute_model("simple_model", SimpleParams(), SolverEngine.ORTOOLS_CPSAT)
+        
+
 if __name__ == "__main__":
 
     logger = SQLiteLogManager(db_path="test.db")
 
-    model = SimpleModel(
-        params=SimpleParams(),
-        solver_engine=SolverEngine.ORTOOLS_CPSAT
+    # model = SimpleModel(
+    #     params=SimpleParams(),
+    #     solver_engine=SolverEngine.ORTOOLS_CPSAT
+    # )
+
+    # result = model.execute(logger=logger)
+    # print(result)
+
+    payload = InputData(
+        id="1"
     )
 
-    result = model.execute(logger=logger)
-    print(result)
+    workflow = SimpleWorkflow(
+        payload=payload,
+        logger=logger
+    )
+
+    output = workflow.invoke()
+    print(output)
