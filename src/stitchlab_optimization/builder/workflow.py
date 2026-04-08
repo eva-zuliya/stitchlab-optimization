@@ -1,9 +1,11 @@
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Dict, Type, Generic, TypeVar, final, Any, Optional, Union
+from typing import get_args, get_origin
 import uuid
 from pydantic import BaseModel
 from datetime import datetime, timezone
 import time
+import traceback
 
 from src.stitchlab_optimization.logger.manager import LogManager, WorkflowLog
 from src.stitchlab_optimization.builder.model import OptimizationModel
@@ -16,22 +18,41 @@ OutputBaseModel = TypeVar("OutputBaseModel", bound=BaseModel)
 
 class WorkflowMeta(ABCMeta):
     def __new__(mcls, name, bases, attrs):
+        # Create class first
+        new_cls = super().__new__(mcls, name, bases, attrs)
+
         # Skip base class
         if ABC in bases:
-            return super().__new__(mcls, name, bases, attrs)
-        
-        if "name" not in attrs:
-            attrs["name"] = name
-    
-        # Enforce that each subclass defines `models_registry`
-        if "models_registry" not in attrs:
+            return new_cls
+
+        # Default name
+        if not hasattr(new_cls, "name"):
+            new_cls.name = name
+
+        # Validate models_registry
+        if not hasattr(new_cls, "models_registry"):
             raise TypeError(f"{name} must define class-level attribute `models_registry`.")
 
-        # Enforce correct type
-        if not isinstance(attrs["models_registry"], dict):
-            raise TypeError(f"{name}.models_registry must be a dict[str, Type[OptimizationModel].")
+        if not isinstance(new_cls.models_registry, dict):
+            raise TypeError(f"{name}.models_registry must be a dict[str, Type[OptimizationModel]].")
 
-        return super().__new__(mcls, name, bases, attrs)
+        for base in getattr(new_cls, "__orig_bases__", []):
+            origin = get_origin(base)
+
+            if origin is OptimizationWorkflow:
+                args = get_args(base)
+
+                if len(args) == 2:
+                    input_model, output_model = args
+
+                    new_cls._input_basemodel = input_model
+                    new_cls._output_basemodel = output_model
+
+        # Safety check
+        if not hasattr(new_cls, "_input_basemodel"):
+            raise TypeError(f"{name} must specify generic types: OptimizationWorkflow[Input, Output]")
+
+        return new_cls
 
 
 class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metaclass=WorkflowMeta):
@@ -40,6 +61,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
     _logger: Optional[LogManager] = None
 
     id: str
+    verbose: bool = False
     name: str
     models_registry: Dict[str, Type[OptimizationModel]] # {model_name : OptimizationModel}
     payload: InputBaseModel
@@ -53,9 +75,10 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
 
     
     @final
-    def __init__(self, payload: Union[Dict, InputBaseModel], logger: Optional[LogManager] = None):
+    def __init__(self, payload: Union[Dict, InputBaseModel], logger: Optional[LogManager] = None, verbose: Optional[bool] = False):
         self.id = str(uuid.uuid4())
         self._logger = logger
+        self.verbose = verbose
 
         if isinstance(payload, dict):
             payload = self._input_basemodel(**payload)
@@ -72,7 +95,11 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
             self.runtime_message = "success"
 
         except Exception as e:
-            self.runtime_message = str(e)
+            self.runtime_message = traceback.format_exc()
+
+            if self.verbose:
+                print(f"\033[91m\n>>> Workflow execution failed: {self.runtime_message}\033[0m\n")
+                traceback.print_exc()
 
         finally:
             self.runtime_seconds = time.time() - start_time
@@ -81,7 +108,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
             if self._logger is not None and self._logger.is_monitor_runtime:
                 self._logger.put_workflow_log(workflow_log=self._workflow_log)
 
-        if self.runtime_message == "success":
+        if self.runtime_message == "success" and result is not None:
             return result.model_dump()
         
         return None
@@ -109,7 +136,8 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
     @property
     def _workflow_log(self) -> WorkflowLog:
         return WorkflowLog(
-            request_id=self.id,
+            workflow_id=self.id,
+            workflow_name=self.name,
             model_ids_execution=self.model_ids_execution,
             payload=self.payload.model_dump(),
             solver_parameter=SolverConfig().SOLVER_PARAMETER,

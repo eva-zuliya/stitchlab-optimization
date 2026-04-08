@@ -38,7 +38,8 @@ class SQLiteLogManager(LogManager):
                 conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self._dir_workflow_execution_log} (
                         id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-                        request_id         TEXT,
+                        workflow_id        TEXT,
+                        workflow_name      TEXT,
                         model_ids          TEXT,      -- store list of str as JSON string
                         payload            TEXT,      -- store JSON payload as string
                         solver_parameter   TEXT,      -- store JSON solver parameter as string

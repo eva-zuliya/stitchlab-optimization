@@ -38,7 +38,8 @@ class ModelLog(BaseModel):
 
 
 class WorkflowLog(BaseModel):
-    request_id: str
+    workflow_id: str
+    workflow_name: str
     model_ids_execution: dict
     payload: dict
     solver_parameter: dict
@@ -55,7 +56,8 @@ class WorkflowLog(BaseModel):
 
         return {
             "id": None,
-            "request_id": self.request_id,
+            "workflow_id": self.workflow_id,
+            "workflow_name": self.workflow_name,
             "model_ids": model_ids,
             "payload": payload,
             "solver_parameter": solver_parameter,

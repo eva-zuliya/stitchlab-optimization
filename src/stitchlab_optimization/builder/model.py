@@ -68,6 +68,10 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         self.model = model
 
     @final
+    def _set_model_vars(self, model_vars: Dict[str, Any]):
+        self.model_vars = model_vars
+
+    @final
     def execute(self) -> Optional[SolutionBaseModel]:
         self.build()
 
@@ -85,7 +89,9 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
     @abstractmethod
     def build(self):
         """
-        MUST call: self._set_model(...)
+        MUST call:
+            self._set_model(...)
+            self._set_model_vars(...)
         """
         ...
 
@@ -94,6 +100,18 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         pass
 
     def solve(self):
+        if self.model is None:
+            print(f"\033[91m\n>>> ERROR while Solving Model : Vars is not setup while building model\n\033[0m")
+            self.solver_status = SolverStatus.ERROR
+
+            raise ValueError(f"ERROR while Solving Model : Model is not saved while building model using solver engine {self.solver_engine}")
+
+        if self.model_vars is None:
+            print(f"\033[91m\n>>> ERROR while Solving Model : Vars is not setup while building model\n\033[0m")
+            self.solver_status = SolverStatus.ERROR
+
+            raise ValueError(f"ERROR while Solving Model : Vars is not saved while building model using solver engine {self.solver_engine}")
+
         if self.solver_engine == SolverEngine.PYSCIPOPT:
             self.solve_pyscipopt()
 
@@ -109,8 +127,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         elif self.solver_engine == SolverEngine.ORTOOLS_CPSAT:
             self.solve_ortools_cpsat()
 
-        else:
-            raise ValueError(f"Solver engine {self.solver_engine} not supported")
+        raise ValueError(f"Solver engine {self.solver_engine} not supported")
     
     def solve_pyscipopt(self):
         SOLVER_CONFIG = SolverConfig()
@@ -248,25 +265,20 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
     def solve_ortools_cpsat(self):
         SOLVER_CONFIG = SolverConfig()
 
-        if self.model_vars is None:
-            print(f"\033[91m\n>>> ERROR while Solving Model : Vars is not setup while building model\n\033[0m")
-            self.solver_status = SolverStatus.ERROR
-        
-        else:
-            solver = cp_model.CpSolver()
-            solver.parameters.max_time_in_seconds = SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60
-            solver.parameters.num_search_workers = SOLVER_CONFIG.LIMIT_MULTI_THREAD
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60
+        solver.parameters.num_search_workers = SOLVER_CONFIG.LIMIT_MULTI_THREAD
 
-            solver.parameters.log_search_progress = SOLVER_CONFIG.MODEL_SOLVER_VERBOSE
+        solver.parameters.log_search_progress = SOLVER_CONFIG.MODEL_SOLVER_VERBOSE
 
-            result_status = solver.Solve(self.model)
-            self.model_output = solver
+        result_status = solver.Solve(self.model)
+        self.model_output = solver
 
-            self.solver_status = SolverStatus.from_ortools_cpsat_status(result_status)
-            print("STATUS", result_status, self.solver_status)
+        self.solver_status = SolverStatus.from_ortools_cpsat_status(result_status)
+        print("STATUS", result_status, self.solver_status)
 
-            if SolverStatus.is_solution_found(self.solver_status):
-                self.construct_solution()
+        if SolverStatus.is_solution_found(self.solver_status):
+            self.construct_solution()
 
     def solve_ortools_scip(self):
         SOLVER_CONFIG = SolverConfig()
