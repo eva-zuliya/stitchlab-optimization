@@ -9,10 +9,10 @@ from ortools.sat.python import cp_model
 from pydantic import BaseModel
 from typing import Any, Dict, Generic, Type, Optional, TypeVar, final
 
-from src.stitchlab_optimization.solver.engine import SolverEngine
-from src.stitchlab_optimization.solver.status import SolverStatus
-from src.stitchlab_optimization.logger.manager import ModelLog, LogManager
-from src.stitchlab_optimization.solver.config import SolverConfig
+from ..solver.engine import SolverEngine
+from ..solver.status import SolverStatus
+from ..logger.manager import ModelLog, LogManager
+from ..solver.config import SolverConfig
 
 
 ParamsBaseModel = TypeVar("ParamsBaseModel", bound="ModelParams")
@@ -127,7 +127,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         elif self.solver_engine == SolverEngine.ORTOOLS_CPSAT:
             self.solve_ortools_cpsat()
 
-        raise ValueError(f"Solver engine {self.solver_engine} not supported")
+        else:
+            raise ValueError(f"Solver engine {self.solver_engine} not supported")
     
     def solve_pyscipopt(self):
         SOLVER_CONFIG = SolverConfig()
@@ -396,11 +397,13 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
 
             # Objective value (only available if model solved)
             try:
-                objective_value = builder.solution.ObjectiveValue()
+                objective_value = builder.model_output.ObjectiveValue()
+                best_bound = builder.model_output.BestObjectiveBound()
+                optimality_gap = abs(objective_value - best_bound) / max(1.0, abs(objective_value))
+
             except Exception:
                 objective_value = None
-
-            optimality_gap = None
+                optimality_gap = None
 
         elif solver_engine == SolverEngine.PYSCIPOPT:
             problem_size_vars = builder.model.getNVars()
