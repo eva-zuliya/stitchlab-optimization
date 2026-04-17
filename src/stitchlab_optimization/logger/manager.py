@@ -3,8 +3,8 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 
-from src.stitchlab_optimization.solver.engine import SolverEngine
-from src.stitchlab_optimization.solver.status import SolverStatus
+from ..solver.engine import SolverEngine
+from ..solver.status import SolverStatus
 
 
 class ModelLog(BaseModel):

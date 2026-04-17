@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 import time
 import traceback
 
-from src.stitchlab_optimization.logger.manager import LogManager, WorkflowLog
-from src.stitchlab_optimization.builder.model import OptimizationModel
-from src.stitchlab_optimization.solver.engine import SolverEngine
-from src.stitchlab_optimization.solver.config import SolverConfig
+from ..logger.manager import LogManager, WorkflowLog
+from ..builder.model import OptimizationModel
+from ..solver.engine import SolverEngine
+from ..solver.config import SolverConfig
 
 
 InputBaseModel = TypeVar("InputBaseModel", bound=BaseModel)
