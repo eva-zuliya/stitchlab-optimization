@@ -74,16 +74,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
     @final
     def execute(self) -> Optional[SolutionBaseModel]:
         self.build()
-
-        if self.model is None:
-            raise ValueError("Model must be built before execution.")
-        
-        if self.solver_engine == SolverEngine.ORTOOLS_CPSAT and self.model_vars is None:    
-            raise ValueError("Model variables (model_vars) must be set in the builder when using OR-Tools CPSAT.")
-
         self.solve()
-        self.solution = self.construct_solution()
-
         return self.solution
 
     @abstractmethod
@@ -184,8 +175,8 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.model.getStatus(), self.solver_status, "\n\n")
 
         if SolverStatus.is_solution_found(self.solver_status):
-            self.construct_solution()
-
+            self.solution = self.construct_solution()
+            
     def solve_gurobi(self):
         SOLVER_CONFIG = SolverConfig()
 
@@ -238,7 +229,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.model.status, self.solver_status, "\n\n")
 
         if SolverStatus.is_solution_found(self.solver_status):
-            self.construct_solution()
+            self.solution = self.construct_solution()
 
     def solve_ortools_routing(self):
         SOLVER_CONFIG = SolverConfig()
@@ -261,7 +252,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.solver_status)
 
         if SolverStatus.is_solution_found(self.solver_status):
-            self.construct_solution()
+            self.solution = self.construct_solution()
 
     def solve_ortools_cpsat(self):
         SOLVER_CONFIG = SolverConfig()
@@ -279,7 +270,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", result_status, self.solver_status)
 
         if SolverStatus.is_solution_found(self.solver_status):
-            self.construct_solution()
+            self.solution = self.construct_solution()
 
     def solve_ortools_scip(self):
         SOLVER_CONFIG = SolverConfig()
@@ -302,7 +293,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", status, self.solver_status, "\n\n")
 
         if SolverStatus.is_solution_found(self.solver_status):
-            self.construct_solution()
+            self.solution = self.construct_solution()
 
 
 class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metaclass=ModelMeta):
