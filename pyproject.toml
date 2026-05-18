@@ -1,6 +1,6 @@
 [project]
 name = "stitchlab-optimization"
-version = "0.0.3"
+version = "0.0.4"
 description = "StitchLab Optimization application"
 readme = "README.md"
 license = {text = "MIT"}

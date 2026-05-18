@@ -22,7 +22,7 @@ The framework is built around two core concepts:
 
 ```python
 from pydantic import BaseModel
-from src.stitchlab_optimization.builder.model import ModelParams
+from stitchlab_optimization.builder.model import ModelParams
 
 class SimpleParams(ModelParams):
     pass
@@ -36,7 +36,7 @@ class SimpleSolution(BaseModel):
 ### 2. Create Builders for Different Solvers
 
 ```python
-from src.stitchlab_optimization.builder.model import ModelBuilder
+from stitchlab_optimization.builder.model import ModelBuilder
 
 class SimpleCPSATBuilder(ModelBuilder[SimpleParams, SimpleSolution]):
     def build(self):
@@ -65,8 +65,8 @@ class SimpleCPSATBuilder(ModelBuilder[SimpleParams, SimpleSolution]):
 ### 3. Register Builders in Your Model
 
 ```python
-from src.stitchlab_optimization.builder.model import OptimizationModel
-from src.stitchlab_optimization.solver.engine import SolverEngine
+from stitchlab_optimization.builder.model import OptimizationModel
+from stitchlab_optimization.solver.engine import SolverEngine
 
 class SimpleModel(OptimizationModel[SimpleParams, SimpleSolution]):
     builders_registry = {
@@ -79,7 +79,7 @@ class SimpleModel(OptimizationModel[SimpleParams, SimpleSolution]):
 ### 4. Create a Workflow
 
 ```python
-from src.stitchlab_optimization.builder.workflow import OptimizationWorkflow
+from stitchlab_optimization.builder.workflow import OptimizationWorkflow
 
 class InputData(BaseModel):
     id: str
@@ -103,7 +103,7 @@ class SimpleWorkflow(OptimizationWorkflow[InputData, OutputData]):
 ### 5. Run Your Workflow
 
 ```python
-from src.stitchlab_optimization.logger.sqlite_logger import SQLiteLogManager
+from stitchlab_optimization.logger.sqlite_logger import SQLiteLogManager
 
 logger = SQLiteLogManager(db_path="test.db")
 
