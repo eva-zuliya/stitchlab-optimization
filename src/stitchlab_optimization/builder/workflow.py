@@ -10,7 +10,7 @@ import traceback
 from ..logger.manager import LogManager, WorkflowLog
 from ..builder.model import OptimizationModel
 from ..solver.engine import SolverEngine
-from ..solver.config import SolverConfig
+from ..solver.params import SolverParams
 
 
 InputBaseModel = TypeVar("InputBaseModel", bound=BaseModel)
@@ -118,14 +118,15 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
         pass
 
     @final
-    def execute_model(self, model_name: str, params: Any, solver_engine: Optional[SolverEngine] = None) -> Any:
+    def execute_model(self, model_name: str, params: Any, solver_engine: Optional[SolverEngine] = None, solver_params: Optional[SolverParams] = None) -> Any:
         if model_name not in self.models_registry:
             raise ValueError(f"Model '{model_name}' not found in models_registry.")
         
         model_cls = self.models_registry[model_name]
         model_instance = model_cls(
             params=params,
-            solver_engine=solver_engine
+            solver_engine=solver_engine,
+            solver_params=solver_params
         )
 
         output = model_instance.execute(logger=self._logger)
@@ -140,7 +141,6 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
             workflow_name=self.name,
             model_ids_execution=self.model_ids_execution,
             payload=self.payload.model_dump(),
-            solver_parameter=SolverConfig().SOLVER_PARAMETER,
             message=self.runtime_message,
             start_timestamp=self.start_timestamp,
             end_timestamp=self.end_timestamp,

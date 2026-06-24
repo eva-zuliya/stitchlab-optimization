@@ -21,6 +21,7 @@ class SQLiteLogManager(LogManager):
                     CREATE TABLE IF NOT EXISTS {self._dir_model_execution_log} (
                         id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                         solver_engine      TEXT,            -- gurobi / ortools / routing
+                        solver_params      TEXT,            -- store JSON solver parameter as string
                         model_id           TEXT,
                         model_name         TEXT,
                         problem_size_vars  INTEGER,         -- number of decision variables
@@ -42,7 +43,6 @@ class SQLiteLogManager(LogManager):
                         workflow_name      TEXT,
                         model_ids          TEXT,      -- store list of str as JSON string
                         payload            TEXT,      -- store JSON payload as string
-                        solver_parameter   TEXT,      -- store JSON solver parameter as string
                         message            TEXT,      -- store error message
                         start_timestamp    TEXT,      -- store start timestamp
                         end_timestamp      TEXT,      -- store end timestamp

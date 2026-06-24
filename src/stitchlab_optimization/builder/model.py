@@ -11,8 +11,8 @@ from typing import Any, Dict, Generic, Type, Optional, TypeVar, final
 
 from ..solver.engine import SolverEngine
 from ..solver.status import SolverStatus
+from ..solver.params import SolverParams
 from ..logger.manager import ModelLog, LogManager
-from ..solver.config import SolverConfig
 
 
 ParamsBaseModel = TypeVar("ParamsBaseModel", bound="ModelParams")
@@ -51,17 +51,19 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
     solution: Optional[SolutionBaseModel] = None
     solver_engine: SolverEngine
     solver_status: SolverStatus
+    solver_params: SolverParams
     model: Any = None
     model_output: Any = None
-    model_vars: Optional[Dict[str, Any]] = None  # Mandatory for OR-Tools CPSAT
+    model_vars: Optional[Dict[str, Any]] = None
     runtime_message: str = ""
     runtime_seconds: float = 0
     
     @final
-    def __init__(self, params: ParamsBaseModel, solver_engine: SolverEngine):
+    def __init__(self, params: ParamsBaseModel, solver_engine: SolverEngine, solver_params: SolverParams):
         self.params = params
         self.solver_engine = solver_engine
         self.solver_status = SolverStatus.UNSOLVED
+        self.solver_params = solver_params
 
     @final
     def _set_model(self, model: Any):
@@ -133,23 +135,23 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             raise ValueError(f"Solver engine {self.solver_engine} not supported")
     
     def solve_pyscipopt(self):
-        SOLVER_CONFIG = SolverConfig()
+        PARAMS = self.solver_params
         start_sol = None
         
-        self.model.setParam("display/verblevel", SOLVER_CONFIG.MODEL_SOLVER_VERBOSE)
+        self.model.setParam("display/verblevel", PARAMS.MODEL_SOLVER_VERBOSE)
 
-        self.model.setIntParam("parallel/maxnthreads", SOLVER_CONFIG.LIMIT_MULTI_THREAD)
-        self.model.setIntParam("parallel/minnthreads", SOLVER_CONFIG.LIMIT_MULTI_THREAD)
+        self.model.setIntParam("parallel/maxnthreads", PARAMS.LIMIT_MULTI_THREAD)
+        self.model.setIntParam("parallel/minnthreads", PARAMS.LIMIT_MULTI_THREAD)
 
-        if SOLVER_CONFIG.APPLY_HEURISTICS:
+        if PARAMS.APPLY_HEURISTICS:
             # Phase 1: Heuristics only
             self.model.setHeuristics(SCIP_PARAMSETTING.AGGRESSIVE)
 
-            self.model.setParam("limits/time", SOLVER_CONFIG.LIMIT_TIME_MINUTES_HEURISTICS*60)
-            self.model.setParam("limits/gap", SOLVER_CONFIG.LIMIT_OPTIMALITY_GAP_HEURISTICS)
+            self.model.setParam("limits/time", PARAMS.LIMIT_TIME_MINUTES_HEURISTICS*60)
+            self.model.setParam("limits/gap", PARAMS.LIMIT_OPTIMALITY_GAP_HEURISTICS)
             self.model.setParam("limits/nodes", 500)   # limit nodes so B&B doesn't go far
             self.model.setParam("presolving/maxrounds", 0)  # skip heavy presolve if desired
-            self.model.setParam("limits/memory", SOLVER_CONFIG.LIMIT_MEMORY_MB)
+            self.model.setParam("limits/memory", PARAMS.LIMIT_MEMORY_MB)
 
             self.model.optimize()
 
@@ -164,9 +166,9 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         self.model.resetParams()
         self.model.setHeuristics(SCIP_PARAMSETTING.DEFAULT)
 
-        self.model.setParam("limits/time", SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC*60)
-        self.model.setParam("limits/gap", SOLVER_CONFIG.LIMIT_OPTIMALITY_GAP_DETERMINISTIC)
-        self.model.setParam("limits/memory", SOLVER_CONFIG.LIMIT_MEMORY_MB)
+        self.model.setParam("limits/time", PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC*60)
+        self.model.setParam("limits/gap", PARAMS.LIMIT_OPTIMALITY_GAP_DETERMINISTIC)
+        self.model.setParam("limits/memory", PARAMS.LIMIT_MEMORY_MB)
 
         try:
             if start_sol is not None:
@@ -186,18 +188,18 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.model.getStatus(), self.solver_status, "\n\n")
             
     def solve_gurobi(self):
-        SOLVER_CONFIG = SolverConfig()
+        PARAMS = self.solver_params
 
-        self.model.setParam('OutputFlag', SOLVER_CONFIG.MODEL_SOLVER_VERBOSE)
+        self.model.setParam('OutputFlag', PARAMS.MODEL_SOLVER_VERBOSE)
 
         start_sol = None
-        if SOLVER_CONFIG.APPLY_HEURISTICS:
+        if PARAMS.APPLY_HEURISTICS:
             # Phase 1: Heuristics only
-            self.model.setParam('TimeLimit', SOLVER_CONFIG.LIMIT_TIME_MINUTES_HEURISTICS * 60)
-            self.model.setParam('MIPGap', SOLVER_CONFIG.LIMIT_OPTIMALITY_GAP_HEURISTICS)
+            self.model.setParam('TimeLimit', PARAMS.LIMIT_TIME_MINUTES_HEURISTICS * 60)
+            self.model.setParam('MIPGap', PARAMS.LIMIT_OPTIMALITY_GAP_HEURISTICS)
             self.model.setParam('NodeLimit', 500)  # limit nodes so B&B doesn't go far
             self.model.setParam('Presolve', 0)  # skip heavy presolve if desired
-            self.model.setParam('Threads', SOLVER_CONFIG.LIMIT_MULTI_THREAD)
+            self.model.setParam('Threads', PARAMS.LIMIT_MULTI_THREAD)
 
             # Set heuristic focus
             self.model.setParam('Heuristics', 0.8)  # Aggressive heuristics
@@ -215,12 +217,12 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
 
         # Phase 2: Exact MILP solving
         # Reset parameters for exact solving
-        self.model.setParam('TimeLimit', SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60)
-        self.model.setParam('MIPGap', SOLVER_CONFIG.LIMIT_OPTIMALITY_GAP_DETERMINISTIC)
+        self.model.setParam('TimeLimit', PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC * 60)
+        self.model.setParam('MIPGap', PARAMS.LIMIT_OPTIMALITY_GAP_DETERMINISTIC)
         self.model.setParam('NodeLimit', 1000000)
         self.model.setParam('Presolve', -1)  # Default presolve
         self.model.setParam('Heuristics', 0.05)  # Default heuristics
-        self.model.setParam('Threads', SOLVER_CONFIG.LIMIT_MULTI_THREAD)
+        self.model.setParam('Threads', PARAMS.LIMIT_MULTI_THREAD)
 
         try:
             if start_sol is not None:
@@ -237,7 +239,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.model.status, self.solver_status, "\n\n")
 
     def solve_ortools_routing(self):
-        SOLVER_CONFIG = SolverConfig()
+        PARAMS = self.solver_params
 
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         search_parameters.first_solution_strategy = (
@@ -249,7 +251,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         )
 
         search_parameters.solution_limit = 100
-        search_parameters.time_limit.seconds = int(SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60)
+        search_parameters.time_limit.seconds = int(PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC * 60)
         
         self.solution = self.model.SolveWithParameters(search_parameters)
     
@@ -257,13 +259,13 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", self.solver_status)
 
     def solve_ortools_cpsat(self):
-        SOLVER_CONFIG = SolverConfig()
+        PARAMS = self.solver_params
 
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60
-        solver.parameters.num_search_workers = SOLVER_CONFIG.LIMIT_MULTI_THREAD
+        solver.parameters.max_time_in_seconds = PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC * 60
+        solver.parameters.num_search_workers = PARAMS.LIMIT_MULTI_THREAD
 
-        solver.parameters.log_search_progress = SOLVER_CONFIG.MODEL_SOLVER_VERBOSE
+        solver.parameters.log_search_progress = PARAMS.MODEL_SOLVER_VERBOSE
 
         result_status = solver.Solve(self.model)
         self.model_output = solver
@@ -272,16 +274,16 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         print("STATUS", result_status, self.solver_status)
 
     def solve_ortools_scip(self):
-        SOLVER_CONFIG = SolverConfig()
+        PARAMS = self.solver_params
 
-        self.model.SetTimeLimit(int(SOLVER_CONFIG.LIMIT_TIME_MINUTES_DETERMINISTIC * 60 * 1000))
-        self.model.SetNumThreads(int(SOLVER_CONFIG.LIMIT_MULTI_THREAD))
+        self.model.SetTimeLimit(int(PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC * 60 * 1000))
+        self.model.SetNumThreads(int(PARAMS.LIMIT_MULTI_THREAD))
 
         params_str = (
-            f"limits/gap={SOLVER_CONFIG.LIMIT_OPTIMALITY_GAP_DETERMINISTIC}\n"
-            f"limits/memory={SOLVER_CONFIG.LIMIT_MEMORY_MB}\n"
-            f"parallel/maxnthreads={int(SOLVER_CONFIG.LIMIT_MULTI_THREAD)}\n"
-            f"lp/threads={int(SOLVER_CONFIG.LIMIT_MULTI_THREAD)}\n"
+            f"limits/gap={PARAMS.LIMIT_OPTIMALITY_GAP_DETERMINISTIC}\n"
+            f"limits/memory={PARAMS.LIMIT_MEMORY_MB}\n"
+            f"parallel/maxnthreads={int(PARAMS.LIMIT_MULTI_THREAD)}\n"
+            f"lp/threads={int(PARAMS.LIMIT_MULTI_THREAD)}\n"
             f"display/verblevel=5\n"
         )
 
@@ -298,15 +300,19 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
     builders_registry: Dict[SolverEngine, Type[ModelBuilder[ParamsBaseModel, SolutionBaseModel]]]
     builder: ModelBuilder[ParamsBaseModel, SolutionBaseModel]
 
-    def __init__(self, params: ParamsBaseModel, solver_engine: Optional[SolverEngine] = None):
+    def __init__(self, params: ParamsBaseModel, solver_engine: Optional[SolverEngine] = None, solver_params: Optional[SolverParams] = None):
         self.id = str(uuid.uuid4())
 
         if solver_engine is None or solver_engine not in self.builders_registry.keys():
             solver_engine = next(iter(self.builders_registry.keys()))
 
+        if solver_params is None:
+            solver_params = SolverParams()
+
         self.builder = self.builders_registry[solver_engine](
             params=params,
-            solver_engine=solver_engine
+            solver_engine=solver_engine,
+            solver_params=solver_params
         )
 
     @final
@@ -341,6 +347,7 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
     def _model_log(self) -> ModelLog:
         builder = self.builder
         solver_engine = self.builder.solver_engine
+        solver_params = self.builder.solver_params
 
         if solver_engine == SolverEngine.GUROBI:
             # Gurobi Python API
@@ -414,6 +421,7 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
 
         return ModelLog(
             solver_engine=solver_engine,
+            solver_params=solver_params,
             model_id=self.id,
             model_name=self.name,
             status=builder.solver_status,

@@ -5,10 +5,12 @@ import json
 
 from ..solver.engine import SolverEngine
 from ..solver.status import SolverStatus
+from ..solver.params import SolverParams
 
 
 class ModelLog(BaseModel):
     solver_engine: SolverEngine
+    solver_params: SolverParams
     model_id: str
     model_name: str
     status: SolverStatus
@@ -24,6 +26,7 @@ class ModelLog(BaseModel):
         return {
             "id": None,
             "solver_engine": self.solver_engine.value,
+            "solver_params": self.solver_params.model_dump_json(),
             "model_id": self.model_id,
             "model_name": self.model_name,
             "problem_size_vars": self.problem_size_vars,
@@ -42,7 +45,6 @@ class WorkflowLog(BaseModel):
     workflow_name: str
     model_ids_execution: dict
     payload: dict
-    solver_parameter: dict
     message: Optional[str]
     start_timestamp: str
     end_timestamp: str
@@ -52,7 +54,6 @@ class WorkflowLog(BaseModel):
     def to_sql_log(self) -> dict:
         model_ids = json.dumps(self.model_ids_execution)
         payload = json.dumps(self.payload)
-        solver_parameter = json.dumps(self.solver_parameter)
 
         return {
             "id": None,
@@ -60,7 +61,6 @@ class WorkflowLog(BaseModel):
             "workflow_name": self.workflow_name,
             "model_ids": model_ids,
             "payload": payload,
-            "solver_parameter": solver_parameter,
             "message": self.message,
             "start_timestamp": self.start_timestamp,
             "end_timestamp": self.end_timestamp,
