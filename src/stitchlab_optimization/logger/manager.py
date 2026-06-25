@@ -100,7 +100,6 @@ class LogManager(ABC):
 
     _dir_model_execution_log: str = "log_execution_model"
     _dir_workflow_execution_log: str = "log_execution_workflow"
-    _dir_resource_occupation_log: str = "log_resource_occupation"
 
     def __init__(self):
         pass
