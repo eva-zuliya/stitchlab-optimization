@@ -12,7 +12,7 @@ from typing import Any, Dict, Generic, Type, Optional, TypeVar, final
 from ..solver.engine import SolverEngine
 from ..solver.status import SolverStatus
 from ..solver.params import SolverParams
-from ..logger.manager import ModelLog, LogManager
+from ..logger.manager import ModelLog, LogManager, ResourceMonitor, NullResourceMonitor
 
 
 ParamsBaseModel = TypeVar("ParamsBaseModel", bound="ModelParams")
@@ -116,22 +116,18 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
 
             raise ValueError(f"ERROR while Solving Model : Vars is not saved while building model using solver engine {self.solver_engine}")
 
-        if self.solver_engine == SolverEngine.PYSCIPOPT:
-            self.solve_pyscipopt()
+        SOLVER = {
+            SolverEngine.PYSCIPOPT: self.solve_pyscipopt,
+            SolverEngine.GUROBI: self.solve_gurobi,
+            SolverEngine.ORTOOLS_SCIP: self.solve_ortools_scip,
+            SolverEngine.ORTOOLS_ROUTING: self.solve_ortools_routing,
+            SolverEngine.ORTOOLS_CPSAT: self.solve_ortools_cpsat,
+        }
 
-        elif self.solver_engine == SolverEngine.GUROBI:
-            self.solve_gurobi()
-
-        elif self.solver_engine == SolverEngine.ORTOOLS_SCIP:
-            self.solve_ortools_scip()
-
-        elif self.solver_engine == SolverEngine.ORTOOLS_ROUTING:
-            self.solve_ortools_routing()
-        
-        elif self.solver_engine == SolverEngine.ORTOOLS_CPSAT:
-            self.solve_ortools_cpsat()
-
-        else:
+        # with ResourceMonitor() as monitor:
+        try:
+            SOLVER[self.solver_engine]()
+        except KeyError:
             raise ValueError(f"Solver engine {self.solver_engine} not supported")
     
     def solve_pyscipopt(self):
@@ -320,9 +316,18 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
         start_time = time.time()
         solution = None
 
+        monitor = (
+            ResourceMonitor(
+                interval_seconds=logger.monitor_resource_interval_seconds
+            )
+            if logger and logger.is_monitor_resource
+            else NullResourceMonitor()
+        )
+
         try :
-            solution = self.builder.execute()
-            self.builder.runtime_message = "success"
+            with monitor:
+                solution = self.builder.execute()
+                self.builder.runtime_message = "success"
 
         except Exception as e:
             print(f"\033[91m\n>>> ERROR while Solving Model : {e}\n\033[0m")
@@ -333,7 +338,10 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
             self.builder.runtime_seconds = end_time - start_time
 
             if logger is not None and logger.is_monitor_optimality:
-                logger.put_model_log(model_log=self._model_log)
+                log = self._model_log
+                log.resource_stats = monitor.stats
+
+                logger.put_model_log(model_log=log)
         
         return solution
 

@@ -31,6 +31,7 @@ class SQLiteLogManager(LogManager):
                         status             TEXT,            -- START / DONE / ERROR
                         message            TEXT,            -- optional note
                         runtime_sec        REAL,            -- optional
+                        resource_stats     TEXT,            -- store JSON resource stats as string
                         created_timestamp  TEXT
                     );
                 """)
@@ -51,21 +52,6 @@ class SQLiteLogManager(LogManager):
                     );
                 """)
 
-            if self.is_monitor_resource:
-                conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self._dir_resource_occupation_log} (
-                        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-                        machine_id         TEXT,
-                        model_id           TEXT,
-                        cpu_percent        REAL,
-                        num_cores          INTEGER,
-                        limit_thread       INTEGER,
-                        memory_mb          REAL,
-                        limit_memory_mb    REAL,
-                        timestamp          TEXT
-                    );
-                """)
-
             conn.commit()
 
     def put_model_log(self, model_log: ModelLog):
@@ -77,6 +63,3 @@ class SQLiteLogManager(LogManager):
         with sqlite3.connect(self.db_path) as conn:
             data = pd.DataFrame([workflow_log.to_sql_log()])
             data.to_sql(self._dir_workflow_execution_log, conn, if_exists="append", index=False)
-
-    def put_resource_log(self, resource_log):
-        return super().put_resource_log(resource_log)
