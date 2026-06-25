@@ -320,7 +320,7 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
             ResourceMonitor(
                 interval_seconds=logger.monitor_resource_interval_seconds
             )
-            if logger and logger.is_monitor_resource
+            if logger and logger.enable_monitor_resource
             else NullResourceMonitor()
         )
 
@@ -337,7 +337,7 @@ class OptimizationModel(Generic[ParamsBaseModel, SolutionBaseModel], ABC, metacl
             end_time = time.time()
             self.builder.runtime_seconds = end_time - start_time
 
-            if logger is not None and logger.is_monitor_optimality:
+            if logger is not None and logger.enable_monitor_optimality:
                 log = self._model_log
                 log.resource_stats = monitor.stats
 

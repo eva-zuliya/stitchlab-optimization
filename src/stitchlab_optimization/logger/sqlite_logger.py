@@ -6,17 +6,22 @@ import pandas as pd
 class SQLiteLogManager(LogManager):
     db_path: str
 
-    def __init__(self, db_path: str, is_monitor_optimality: bool = True, is_monitor_runtime: bool = True, is_monitor_resource: bool = False):
+    def __init__(
+            self, db_path: str,
+            enable_monitor_optimality: bool = True,
+            enable_monitor_runtime: bool = True,
+            enable_monitor_resource: bool = False
+        ):
         self.db_path = db_path
-        self.is_monitor_optimality = is_monitor_optimality
-        self.is_monitor_resource = is_monitor_resource
-        self.is_monitor_runtime = is_monitor_runtime
+        self.enable_monitor_optimality = enable_monitor_optimality
+        self.enable_monitor_resource = enable_monitor_resource
+        self.enable_monitor_runtime = enable_monitor_runtime
     
         self.init_db()
 
     def init_db(self):
         with sqlite3.connect(self.db_path) as conn:
-            if self.is_monitor_optimality:
+            if self.enable_monitor_optimality:
                 conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self._dir_model_execution_log} (
                         id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +41,7 @@ class SQLiteLogManager(LogManager):
                     );
                 """)
 
-            if self.is_monitor_runtime:
+            if self.enable_monitor_runtime:
                 conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self._dir_workflow_execution_log} (
                         id                 INTEGER PRIMARY KEY AUTOINCREMENT,

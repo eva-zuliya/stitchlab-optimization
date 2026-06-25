@@ -93,9 +93,9 @@ class WorkflowLog(BaseModel):
 
 
 class LogManager(ABC):
-    is_monitor_optimality: bool = True
-    is_monitor_runtime: bool = True
-    is_monitor_resource: bool = False
+    enable_monitor_optimality: bool = True
+    enable_monitor_runtime: bool = True
+    enable_monitor_resource: bool = False
     monitor_resource_interval_seconds: int = 5
 
     _dir_model_execution_log: str = "log_execution_model"

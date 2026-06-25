@@ -105,7 +105,7 @@ class OptimizationWorkflow(Generic[InputBaseModel, OutputBaseModel], ABC, metacl
             self.runtime_seconds = time.time() - start_time
             self.end_timestamp = datetime.now(timezone.utc).isoformat()
 
-            if self._logger is not None and self._logger.is_monitor_runtime:
+            if self._logger is not None and self._logger.enable_monitor_runtime:
                 self._logger.put_workflow_log(workflow_log=self._workflow_log)
 
         if self.runtime_message == "success" and result is not None:
