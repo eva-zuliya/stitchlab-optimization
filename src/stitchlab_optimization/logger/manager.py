@@ -58,7 +58,7 @@ class ModelLog(BaseModel):
             "status": self.status.value,
             "message": self.message,
             "runtime_sec": self.runtime_sec,
-            "resource_stats": self.resource_stats.model_dump_json(),
+            "resource_stats": self.resource_stats.model_dump_json() if self.resource_stats else None,
             "created_timestamp": self.created_timestamp
         }
 
