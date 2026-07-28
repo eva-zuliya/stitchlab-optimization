@@ -260,6 +260,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = PARAMS.LIMIT_TIME_MINUTES_DETERMINISTIC * 60
         solver.parameters.num_search_workers = PARAMS.LIMIT_MULTI_THREAD
+        solver.parameters.relative_gap_limit = PARAMS.LIMIT_OPTIMALITY_GAP_DETERMINISTIC
 
         solver.parameters.log_search_progress = PARAMS.MODEL_SOLVER_VERBOSE
 
