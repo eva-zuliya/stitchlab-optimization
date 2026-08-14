@@ -281,8 +281,11 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
             f"limits/memory={PARAMS.LIMIT_MEMORY_MB}\n"
             f"parallel/maxnthreads={int(PARAMS.LIMIT_MULTI_THREAD)}\n"
             f"lp/threads={int(PARAMS.LIMIT_MULTI_THREAD)}\n"
-            f"display/verblevel=5\n"
         )
+
+        if PARAMS.MODEL_SOLVER_VERBOSE:
+            self.model.EnableOutput()
+            params_str += "display/verblevel=5\n"
 
         self.model.SetSolverSpecificParametersAsString(params_str)
 
