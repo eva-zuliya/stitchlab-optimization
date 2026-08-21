@@ -285,7 +285,7 @@ class ModelBuilder(Generic[ParamsBaseModel, SolutionBaseModel], ABC):
 
         if PARAMS.MODEL_SOLVER_VERBOSE:
             self.model.EnableOutput()
-            params_str += "display/verblevel=5\n"
+            params_str += "display/verblevel=3\n"
 
         self.model.SetSolverSpecificParametersAsString(params_str)
 
